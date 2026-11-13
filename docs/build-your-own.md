@@ -34,7 +34,7 @@ the chat cards.
 
 [createMoonAgent](../src/agent/agent.ts) registers three skills from
 [skills.ts](../src/agent/skills.ts) and the tools from
-[tools.ts](../src/agent/tools.ts). A skill is Markdown: guidance plus an
+[tools/](../src/agent/tools/index.ts). A skill is Markdown: guidance plus an
 `allowed-tools` list. The `explore` skill covers finding and visiting things.
 
 Before each turn, `runtimeContextLoader` tells the model what the map shows:
@@ -81,8 +81,8 @@ is still flying.
 ## Add a tool
 
 Start with something small and read-only, for example counting the missions
-shown at the slider's current date. In `createTools` in
-[tools.ts](../src/agent/tools.ts):
+shown at the slider's current date. In `createMissionTools` in
+[tools/missions.ts](../src/agent/tools/missions.ts):
 
 ```ts
 const countVisibleMissions = new FunctionTool({
@@ -99,10 +99,11 @@ const countVisibleMissions = new FunctionTool({
 
 Then:
 
-1. Add it to the array that `createTools` returns.
-2. Add `countVisibleMissions` to `allowed-tools` in the `history` skill in
+1. Return it from `createMissionTools`, next to `setTime`.
+2. Add it to the list in [tools/index.ts](../src/agent/tools/index.ts).
+3. Add `countVisibleMissions` to `allowed-tools` in the `history` skill in
    [skills.ts](../src/agent/skills.ts), with a line saying when to use it.
-3. Ask the assistant: "How many missions are on the map right now?"
+4. Ask the assistant: "How many missions are on the map right now?"
 
 Add a card only if it helps the user. Many tools need only a return value.
 

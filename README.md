@@ -102,7 +102,7 @@ src/
   map/              The maps and everything that changes them
     controller.ts   The shared map actions (visit, select, frame, ...)
   agent/            The assistant: instructions, skills, tools
-    tools.ts        The 12 tools. Start with goTo
+    tools/          The 12 tools, a few per file. Start with navigate.ts
   cards/            Chat cards and charts
   extras/           Optional: 3D lander model, flight easter egg
 test/               Unit tests
@@ -111,7 +111,7 @@ backups/            CSV copies of the data layers
 ```
 
 Read [App.tsx](./src/App.tsx), then [controller.ts](./src/map/controller.ts),
-then [tools.ts](./src/agent/tools.ts). The
+then [tools/navigate.ts](./src/agent/tools/navigate.ts). The
 [build-your-own guide](./docs/build-your-own.md) follows one request through
 these files and shows how to add a tool.
 
@@ -137,6 +137,12 @@ pnpm test && pnpm check-types && pnpm lint && pnpm build
 
 Details are in the [reference](./docs/reference.md#data). This project is not
 affiliated with or endorsed by NASA.
+
+## AI-assisted development
+
+This app was built with help from AI coding tools. The code and docs were
+reviewed by a person, but mistakes may remain. Check anything you plan to rely
+on, and please open an issue if you find a problem.
 
 ## License
 

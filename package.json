@@ -1,6 +1,8 @@
 {
   "name": "talk-to-the-moon",
   "version": "0.1.0",
+  "description": "An AI assistant that drives a 3D map of the Moon, built with the ArcGIS Maps SDK for JavaScript.",
+  "repository": "github:balumuriraj/talk-to-the-moon",
   "private": true,
   "license": "MIT",
   "type": "module",

@@ -2,7 +2,7 @@ import type FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
 
 /**
  * The app's data: three public hosted layers (no sign-in needed) plus a few static references.
- * Upload backups of the layers are in backups/; sources and terms are in docs/reference.md.
+ * CSV copies of the layers are in backups/; sources and terms are in docs/reference.md.
  *
  * Missions (51) and launch sites (10) are small, so they're read once at startup and used as
  * plain arrays. Craters (1,575) stay on the service and are queried with SQL when needed.

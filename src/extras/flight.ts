@@ -10,7 +10,7 @@ import { moonPoint, offset, sceneMeters, type LatLon } from "../map/scale";
  * Optional easter egg: fly the lunar module around the Moon with the arrow keys.
  * ← → steer, ↑ ↓ climb and descend, Esc lands. Ask the guide "let me fly".
  *
- * To remove it: delete this file, the `flyLander` tool in agent/tools.ts, and `fly` in map/controller.ts.
+ * To remove it: delete this file, the `flyLander` tool in agent/tools/navigate.ts, and `fly` in map/controller.ts.
  */
 
 /** Drawn far larger than life (the real one is 7 m tall), so it reads from the chase camera. */

@@ -86,7 +86,7 @@ A mission's `launchSiteId` points to these ids, so keep them stable.
 ## SDK caveats (5.2)
 
 - **Tool errors.** An error thrown by a tool ends the whole request. The
-  `returnErrors` wrapper in [tools.ts](../src/agent/tools.ts) returns the error
+  `returnErrors` wrapper in [tools/shared.ts](../src/agent/tools/shared.ts) returns the error
   to the model instead.
 - **Popups.** Closing a popup clears its content but leaves the frame open, so
   [App.tsx](../src/App.tsx) closes it on `arcgisClose`. Automatic popup

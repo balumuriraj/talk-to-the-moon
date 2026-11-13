@@ -24,7 +24,7 @@ app does not choose or host the model.
 flowchart TD
   App["App.tsx<br/>page layout"]
   controller["map/controller.ts<br/>createMoonApp() returns app"]
-  agent["agent/<br/>agent.ts, skills.ts, tools.ts"]
+  agent["agent/<br/>agent.ts, skills.ts, tools/"]
   cards["cards/<br/>chat cards and charts"]
   map["map/<br/>moon, earth, graphics, travel, scale"]
   extras["extras/<br/>siteModel, flight"]
@@ -117,7 +117,7 @@ and a list of allowed tools.
 - The tool descriptions list the exact values in the data (countries,
   operators, launch-site ids), so the model does not guess them.
 - Tool errors go back to the model. Without the `returnErrors` wrapper in
-  [tools.ts](../src/agent/tools.ts), SDK 5.2 ends the request with "I couldn't
+  [tools/shared.ts](../src/agent/tools/shared.ts), SDK 5.2 ends the request with "I couldn't
   complete this request."
 - Before each turn the model is told which world is showing, the slider dates,
   the selection, the last place the camera went, and what is drawn. This is how

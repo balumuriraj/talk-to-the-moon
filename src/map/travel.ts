@@ -1,10 +1,10 @@
 import Camera from "@arcgis/core/Camera.js";
 import Point from "@arcgis/core/geometry/Point.js";
 import type { ResourceHandle } from "@arcgis/core/core/Handles.js";
-import { isAbortError } from "@arcgis/core/core/promiseUtils.js";
 import type SceneView from "@arcgis/core/views/SceneView.js";
 import { MOON_RADIUS_M } from "../data";
 import { wholeMoon, type LatLon } from "./scale";
+import { ignoreAbort, reducedMotion } from "./util";
 
 export type World = "earth" | "moon";
 
@@ -26,8 +26,6 @@ const earthCamera = (p: LatLon, altitudeM: number) =>
     heading: 0,
   });
 
-const reducedMotion = () =>
-  matchMedia("(prefers-reduced-motion: reduce)").matches;
 const easeIn = (t: number) => t * t;
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 
@@ -69,9 +67,6 @@ function slide(
   });
 }
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const ignoreAbort = (error: unknown) => {
-  if (!isAbortError(error)) throw error;
-};
 
 /**
  * Two stacked scenes, Earth and the Moon, both loaded up front. A trip pulls the camera back

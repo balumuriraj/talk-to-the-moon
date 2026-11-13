@@ -1,5 +1,4 @@
 import type { ResourceHandle } from "@arcgis/core/core/Handles.js";
-import { isAbortError } from "@arcgis/core/core/promiseUtils.js";
 import Multipoint from "@arcgis/core/geometry/Multipoint.js";
 import { getDenormalizedExtent } from "@arcgis/core/geometry/support/normalizeUtils.js";
 import FeatureFilter from "@arcgis/core/layers/support/FeatureFilter.js";
@@ -19,6 +18,7 @@ import {
   type LatLon,
 } from "./scale";
 import { Travel } from "./travel";
+import { ignoreAbort, reducedMotion } from "./util";
 
 export interface MoonElements {
   moon: HTMLArcgisSceneElement;
@@ -28,10 +28,6 @@ export interface MoonElements {
   /** Holds both scenes; `data-world` crossfades between them. */
   stage: HTMLElement;
 }
-
-const ignoreAbort = (error: unknown) => {
-  if (!isAbortError(error)) throw error;
-};
 
 /**
  * Waits for both scenes, reads the data, and returns the map actions that the agent's tools and
@@ -126,7 +122,7 @@ export async function createMoonApp(
       return false;
     }
     // Turn a little around the point. Dragging, zooming, or any new goTo stops it.
-    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (!reducedMotion()) {
       view
         .goTo(
           { ...camera, heading: heading + 30 },
