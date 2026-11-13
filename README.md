@@ -4,6 +4,12 @@ An AI assistant that drives a 3D map. Ask **"Take me to Apollo 11"** and it
 finds the mission, flies the camera from Earth to the Moon, stands a lunar
 module at the landing site, and shows a card in the chat.
 
+![Asking where the Apollo missions landed: the camera leaves Earth and arrives at the Moon](./docs/images/demo.gif)
+
+Watch the full one-minute demo:
+
+https://github.com/user-attachments/assets/94fcb1e4-a664-470e-bb05-423173fabc6a
+
 It is a small example of an **agentic map**: a chat assistant that can only act
 through a few typed tools over real data. The same pattern works on any map.
 
