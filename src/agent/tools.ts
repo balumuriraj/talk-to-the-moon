@@ -30,7 +30,6 @@ import {
   type Crater,
   type Mission,
 } from "../data";
-import { photoFor } from "../extras/photos";
 import type { MoonApp } from "../map/controller";
 import {
   SHAPES,
@@ -148,7 +147,6 @@ const missionFacts = (app: MoonApp, m: Mission) => ({
     : undefined,
   daysToSurface: daysToSurface(m),
   side: isFarSide(m) ? "Far side" : "Near side",
-  photoFromOrbit: photoFor(m.id),
 });
 
 const identifier = z.string().regex(/^[A-Za-z_]\w*$/);

@@ -10,7 +10,6 @@ import {
   type Country,
   type Mission,
 } from "../data";
-import { photoFor } from "../extras/photos";
 import type { MoonApp } from "../map/controller";
 import type { CardData } from "./Cards";
 import { Metric } from "./Metric";
@@ -54,8 +53,6 @@ export function MissionCard({
         <Flag country={m.country} />{" "}
         {m.operator ? `${m.operator}, ${m.country}` : m.country}
       </calcite-chip>
-      <br />
-      <SitePhoto mission={m} />
       <br />
       <calcite-table caption={`${m.name} details`} scale="s">
         {m.crew ? (
@@ -130,33 +127,4 @@ function visit(app: MoonApp, m: Mission) {
     .catch((error: unknown) =>
       console.error(`Could not visit ${m.name}:`, error),
     );
-}
-
-/** The site seen from lunar orbit, with LROC's image details and credit. */
-function SitePhoto({ mission }: { mission: Mission }) {
-  const p = photoFor(mission.id);
-  if (!p) return null;
-  return (
-    <calcite-card label={`${mission.name} site photo`}>
-      <img
-        slot="thumbnail"
-        src={`/photos/${mission.id}.jpg`}
-        alt={`${mission.name} site from lunar orbit, ${formatDate(p.date)}`}
-        loading="lazy"
-      />
-      <span slot="description">
-        {mission.name} site from orbit, {formatDate(p.date)}: {p.altitudeKm} km
-        up, {p.metersPerPixel} m per pixel. LROC image {p.imageId},
-        NASA/GSFC/Arizona State University.
-      </span>
-      <calcite-link
-        slot="footer-start"
-        href={p.page}
-        target="_blank"
-        rel="noopener"
-      >
-        View original LROC image
-      </calcite-link>
-    </calcite-card>
-  );
 }

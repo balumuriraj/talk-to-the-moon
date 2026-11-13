@@ -1,5 +1,5 @@
 /**
- * A guided tour: the demo in demo.md as suggested prompts. The assistant shows the first one; after
+ * A guided tour: the demo in docs/demo.md as suggested prompts. The assistant shows the first one; after
  * each reply it offers the step after the last one asked, so clicking through runs the whole demo.
  * Typing something else is fine: the tour waits and offers the same step again.
  */

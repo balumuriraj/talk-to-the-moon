@@ -1,113 +1,99 @@
 # Reference
 
-Configuration, data sources and their terms, and SDK caveats.
-Start with the [README](../README.md) and the [walkthrough](./build-your-own.md).
+Configuration, data sources, and SDK caveats.
 
 ## Configuration
 
-Copy `.env.example` to `.env.local` in this app directory and restart the dev server:
+Copy `.env.example` to `.env.local` and restart the dev server:
 
 ```bash
-NEXT_PUBLIC_PORTAL_URL=...      # the AI-enabled portal (default https://www.arcgis.com)
+NEXT_PUBLIC_PORTAL_URL=...      # the portal with the AI service (default https://www.arcgis.com)
 NEXT_PUBLIC_ARCGIS_API_KEY=...  # only if your setup needs one
-NEXT_PUBLIC_PHOTOS=off          # hide the LROC site photos (or add ?photos=off to the URL)
 ```
 
-All `NEXT_PUBLIC_` values are embedded in the browser bundle. Supported browsers
-are Chrome/Edge 123+, Firefox 120+, and Safari 17.5+. Voice input uses the
-browser's speech recognition, so it works best in Chrome.
+`NEXT_PUBLIC_` values are embedded in the browser bundle, so do not put secrets
+in them.
 
-## Demo script
-
-See [demo.md](../demo.md): setup, the script with talking points, backups, and recovery.
+Supported browsers are Chrome and Edge 123+, Firefox 120+, and Safari 17.5+.
+Voice input uses the browser's speech recognition and works best in Chrome.
 
 ## Data
 
-All three layers are public on ArcGIS Online, and `backups/` has CSV copies for
-republishing. The app reads missions and launch sites once at startup. Craters are
-queried from the service when needed.
+All three layers are public on ArcGIS Online. `backups/` has CSV copies in case
+you want to publish your own.
 
-**Missions** come from the [Moon Missions layer](https://jsapi.maps.arcgis.com/home/item.html?id=5e7a5e537f274ec19bede7998ae464be)
-([FeatureServer/0](https://services.arcgis.com/V6ZHFr6zdgNZuVG0/arcgis/rest/services/moon_missions/FeatureServer/0)):
-51 spacecraft that reached the surface at a known location, from NASA NSSDCA's
-[Table of Anthropogenic Impacts and Spacecraft on the Moon](https://nssdc.gsfc.nasa.gov/planetary/lunar/lunar_artifact_impacts.html)
-(updated 13 August 2025). Most coordinates come from Lunar Reconnaissance Orbiter
-imagery. Sites without an LRO fix are marked `approximate`. Mission debris such as
-S-IVB stages and ascent stages is left out. The original launch references are in
-[backups/mission-sources.json](../backups/mission-sources.json): `nssdca` and
-`siddiqi` refer to NASA NSSDCA spacecraft pages and Asif Siddiqi's *Beyond Earth*
-(NASA SP-2018-4041), and other source values are URLs.
+### Missions
 
-**Launch sites** come from the [Moon Launch Sites layer](https://www.arcgis.com/home/item.html?id=78ad3a153bef46e3af31a08fa3e78b81).
-A mission's `launchSiteId` refers to these ids, so keep them stable.
+51 spacecraft that reached the Moon's surface at a known location.
 
-**Craters** come from the [Moon Craters layer](https://jsapi.maps.arcgis.com/home/item.html?id=664148a6ef744843b1641d6fe29332c7)
-([FeatureServer/0](https://services.arcgis.com/V6ZHFr6zdgNZuVG0/arcgis/rest/services/moon-craters/FeatureServer/0)):
-1,575 named craters from the IAU/USGS [Gazetteer of Planetary Nomenclature](https://planetarynames.wr.usgs.gov/Page/MOON/target),
-a crater-only extract of the 2019 export mirrored in
-[eleanorlutz/moon_geology_atlas_of_space](https://github.com/eleanorlutz/moon_geology_atlas_of_space).
-Lettered satellite craters such as "Abbe H" are left out, and depths aren't
-included. Shackleton, Whipple, and Hinshelwood are too close to the poles for
-Web Mercator geometry. The app works from the `lat` and `lon` attributes, so it
-can still search, measure, and mark them.
+- Layer: [Moon Missions](https://jsapi.maps.arcgis.com/home/item.html?id=5e7a5e537f274ec19bede7998ae464be)
+  ([FeatureServer/0](https://services.arcgis.com/V6ZHFr6zdgNZuVG0/arcgis/rest/services/moon_missions/FeatureServer/0))
+- Source: NASA NSSDCA,
+  [Table of Anthropogenic Impacts and Spacecraft on the Moon](https://nssdc.gsfc.nasa.gov/planetary/lunar/lunar_artifact_impacts.html)
+  (updated 13 August 2025)
+- Most coordinates come from Lunar Reconnaissance Orbiter imagery. Sites
+  without one are marked `approximate`.
+- Debris such as spent rocket stages is left out.
+- Launch details are sourced in
+  [backups/mission-sources.json](../backups/mission-sources.json). There,
+  `nssdca` means a NASA NSSDCA spacecraft page and `siddiqi` means Asif
+  Siddiqi's *Beyond Earth* (NASA SP-2018-4041). Other values are URLs.
 
-**Photos** of 22 sites come from the Lunar Reconnaissance Orbiter Camera's
-[Featured Sites](https://lroc.im-ldi.com/featured_sites) (NASA/GSFC/Arizona State
-University). LROC's website images are copyrighted: educational use with credit
-is allowed, but [commercial use needs their permission](https://lroc.im-ldi.com/about/terms).
-Hide them with `?photos=off` or `NEXT_PUBLIC_PHOTOS=off` until that's settled.
+### Launch sites
 
-**The lander model** is NASA's Apollo Lunar Module from NASA 3D Resources; see
-[public/models/README.md](../public/models/README.md).
+10 spaceports, from the
+[Moon Launch Sites layer](https://www.arcgis.com/home/item.html?id=78ad3a153bef46e3af31a08fa3e78b81).
+A mission's `launchSiteId` points to these ids, so keep them stable.
 
-**Flags** in `public/flags/` are simplified illustrations drawn for this app, not
-official flag specifications.
+### Craters
 
-### Publishing missions
+1,575 named craters.
 
-- Use `lat` and `lon` as coordinate fields. These are lunar coordinates stored in
-  Earth geometry for display, as with the crater layer.
-- Keep `id` as text. It links missions to photos, models, and rideshares.
-- Publish `arrivalDate` and `launchDate` as **Date** fields with **UTC** as the
-  input time zone, and enable time on `arrivalDate`. The source has calendar dates,
-  so each one is at 12:00:00 UTC.
-- `commercial`, `sampleReturn`, and `approximate` are integers: 1 for true, 0 for false.
-- `crew` holds semicolon-separated surface crew names. `orbitingCrew` is separate.
+- Layer: [Moon Craters](https://jsapi.maps.arcgis.com/home/item.html?id=664148a6ef744843b1641d6fe29332c7)
+  ([FeatureServer/0](https://services.arcgis.com/V6ZHFr6zdgNZuVG0/arcgis/rest/services/moon-craters/FeatureServer/0))
+- Source: the IAU/USGS
+  [Gazetteer of Planetary Nomenclature](https://planetarynames.wr.usgs.gov/Page/MOON/target),
+  from the 2019 export mirrored in
+  [eleanorlutz/moon_geology_atlas_of_space](https://github.com/eleanorlutz/moon_geology_atlas_of_space)
+- Lettered satellite craters such as "Abbe H" are left out. Depths are not
+  included.
+- Shackleton, Whipple, and Hinshelwood are too close to the poles for Web
+  Mercator geometry. The app uses the `lat` and `lon` attributes instead, so it
+  can still find and mark them.
+
+### Other assets
+
+- The lander model is NASA's Apollo Lunar Module from NASA 3D Resources. See
+  [public/models/README.md](../public/models/README.md).
+- The flags in `public/flags/` are simplified drawings made for this app, not
+  official flag specifications.
+
+## Publishing your own missions layer
+
+- Use `lat` and `lon` as the coordinate fields. They are lunar coordinates
+  stored as Earth geometry so the map can display them.
+- Keep `id` as text. Rideshares and the 3D model refer to missions by id.
+- Publish `arrivalDate` and `launchDate` as Date fields in UTC, and enable time
+  on `arrivalDate`. The source has calendar dates only, so each is set to
+  12:00 UTC.
+- `commercial`, `sampleReturn`, and `approximate` are integers: 1 for true, 0
+  for false.
+- `crew` holds the surface crew's names separated by semicolons. `orbitingCrew`
+  is a separate field.
 - A new country needs a flag in `public/flags/` and an entry in `FLAGS` in
   [data.ts](../src/data.ts). A new outcome needs an icon in `public/icons/`.
 
-A coded-value domain on `outcome` (crewed → "Crewed landing", ...) would let the
-hosted layer's popups and legend show labels directly. The chart table already
-adds one ([cards/charts.ts](../src/cards/charts.ts)). Until the service has the
-domain, the popup decodes outcomes with an Arcade expression.
-
-## True-scale objects
-
-`placeObject` stands any object the guide knows at true scale: the model supplies the
-name, height, optional width, and one of five shapes (tower, mountain, block,
-cylinder, sphere), drawn from SDK primitives in [graphics.ts](../src/map/graphics.ts).
-Sizes come from the model's general knowledge, not this app's data, so the card
-and the tool result say so, and the schema rejects heights outside 0.1 m to 20 km.
-
-## How the Moon is drawn
-
-The lunar imagery and elevation services are published in Web Mercator, so the
-scene draws the Moon on an Earth-sized globe. [scale.ts](../src/map/scale.ts) is
-the only place that converts: `sceneMeters()` scales real lunar meters by about
-3.67 for symbol sizes and map scales. Distances and circles use the geodetic
-operators in the Moon's own coordinate system (GCS_Moon_2000, wkid 104903), so
-they're true lunar distances.
-
-The SceneView also supports GCS_Moon_2000 directly, as an experimental feature,
-but that needs imagery and elevation services published in it.
-
 ## SDK caveats (5.2)
 
+- **Tool errors.** An error thrown by a tool ends the whole request. The
+  `returnErrors` wrapper in [tools.ts](../src/agent/tools.ts) returns the error
+  to the model instead.
 - **Popups.** Closing a popup clears its content but leaves the frame open, so
-  [App.tsx](../src/App.tsx) closes it on `arcgisClose`. Automatic popup templates
-  come up empty, so both layers define their popup templates.
-- **The assistant's voice-input property** isn't in the React typings yet, so
-  `voice-input-enabled` is passed as an attribute.
-- **Two WebGL scenes** render at once so the trip between worlds is instant. If a
-  recording machine struggles, check the GPU in the browser's task manager.
-- **chooseMission** accepts the offered mission id or its label as the user's answer.
+  [App.tsx](../src/App.tsx) closes it on `arcgisClose`. Automatic popup
+  templates come up empty, so both layers define their own.
+- **Voice input.** The assistant's voice-input property is not in the React
+  typings yet, so `voice-input-enabled` is passed as an attribute.
+- **Two WebGL scenes** render at the same time. If a machine struggles, check
+  GPU use in the browser's task manager.
+- **chooseMission** accepts either the mission id or its label as the user's
+  answer.

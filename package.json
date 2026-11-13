@@ -2,6 +2,7 @@
   "name": "talk-to-the-moon",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "browserslist": [
     "Chrome >= 123",
