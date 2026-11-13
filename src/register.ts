@@ -9,7 +9,6 @@ import "@esri/calcite-components/components/calcite-button";
 import "@esri/calcite-components/components/calcite-action";
 import "@esri/calcite-components/components/calcite-card";
 import "@esri/calcite-components/components/calcite-chip";
-import "@esri/calcite-components/components/calcite-link";
 import "@esri/calcite-components/components/calcite-loader";
 import "@esri/calcite-components/components/calcite-table";
 import "@esri/calcite-components/components/calcite-table-row";

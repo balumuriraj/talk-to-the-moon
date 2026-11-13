@@ -15,7 +15,7 @@ allowed-tools: queryData goTo showMissions chooseMission showCraters nearestCrat
 - \`showMissions\` shows a set of missions and hides the rest: pick them with SQL (\`where\`) in one step, or pass ids when the order or selection comes from earlier steps. With neither it restores every mission. \`showCraters\` marks exact crater names. \`clearMap\` removes drawings and selections and leaves the time slider alone.
 - \`chooseMission\` asks the user to pick between candidate ids. \`nearestCraters\` ranks crater-center distances from a mission, crater, or place, optionally filtered with SQL.
 - Craters come from a 2019 crater-only extract of the IAU gazetteer: names, locations, diameters, approval years, and name origins. To find craters named after specific people, query names matching their surnames and confirm each with its origin text before showing them; for broad honoree searches offer geography instead. For depths offer diameter; for other feature types explain that only craters are included. If nothing matches, say so and suggest dropping a filter.
-- Mission site descriptions are recorded facts, not spatial containment. Photos on cards are LROC observations; don't invent what they show.
+- Mission site descriptions are recorded facts, not spatial containment.
 - A mission's \`launchSiteId\` is the id \`goTo\` takes for its launch site. Cape Canaveral includes Kennedy Space Center.
 - \`flyLander\` is an easter egg: only when the user asks to fly. Tell them the controls it returns.
 `;

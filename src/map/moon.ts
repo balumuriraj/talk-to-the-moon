@@ -13,7 +13,6 @@ import IconSymbol3DLayer from "@arcgis/core/symbols/IconSymbol3DLayer.js";
 import LabelSymbol3D from "@arcgis/core/symbols/LabelSymbol3D.js";
 import PointSymbol3D from "@arcgis/core/symbols/PointSymbol3D.js";
 import TextSymbol3DLayer from "@arcgis/core/symbols/TextSymbol3DLayer.js";
-import LineCallout3D from "@arcgis/core/symbols/callouts/LineCallout3D.js";
 import {
   CRATERS_URL,
   MISSIONS_URL,
@@ -26,6 +25,7 @@ import {
   type Outcome,
 } from "../data";
 import { SiteModel } from "../extras/siteModel";
+import { leaderLine } from "./symbols";
 
 const MOON_IMAGERY =
   "https://tiles.arcgis.com/tiles/WQ9KVmV6xGGMnCiQ/arcgis/rest/services/Moon_Basemap_Tile0to9/MapServer";
@@ -203,11 +203,7 @@ function missionSymbol(outcome: Outcome, country: Country): PointSymbol3D {
       maxWorldLength: 200_000,
       minWorldLength: 0,
     },
-    callout: new LineCallout3D({
-      size: 1,
-      color: [255, 255, 255, 0.75],
-      border: { color: [6, 8, 14, 0.6] },
-    }),
+    callout: leaderLine(),
   });
 }
 

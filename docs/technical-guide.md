@@ -1,293 +1,247 @@
 # Technical guide
 
-How Talk to the Moon works, for answering technical questions during a demo. For the demo
-itself see [demo.md](../demo.md); for configuration and data terms see [reference.md](./reference.md).
+How Talk to the Moon works. Read the [README](../README.md) first for the short
+version. Configuration and data sources are in the [reference](./reference.md).
 
-## In one line
+## Stack
 
-A **Next.js/React app on the ArcGIS Maps SDK for JavaScript 5.2** (`5.2.4`), where an
-**`arcgis-assistant` chat** runs a **`SkillAgent`** that controls a **3D `SceneView`** through
-**11 typed tools**. Every fact comes from **three public hosted feature layers**. There's no custom
-backend: the language model runs on Esri's AI service through the portal you sign in to.
-
-## 1. Stack
-
-| Layer | What's used |
+| Part | What's used |
 | --- | --- |
-| Framework | Next.js 16 (App Router), React 19, TypeScript. The page renders client-only (`ssr: false`) because the SDK needs the browser |
-| Map | `@arcgis/core` 5.2 and `@arcgis/map-components`: two `arcgis-scene` elements (Moon and Earth), `arcgis-time-slider`, legend, popups |
-| AI | `@arcgis/ai-components`: `arcgis-assistant` (chat UI and sign-in), `SkillAgent`, `FunctionTool` (built on LangChain) |
-| Charts | `@arcgis/charts-components`: native `arcgis-chart` |
-| UI | Calcite Design System (shell, panels, cards, tables, lists) |
-| Validation | Zod schemas for every tool's input |
-| Size | About 2,760 lines in `src/` and `app/`; 8 tests that run the real SDK in Node |
+| Framework | Next.js 16 (App Router), React 19, TypeScript. The page renders in the browser only, because the SDK needs it |
+| Map | `@arcgis/core` and `@arcgis/map-components` 5.2: two `arcgis-scene` elements (Moon and Earth), `arcgis-time-slider`, legend, popups |
+| AI | `@arcgis/ai-components`: `arcgis-assistant` (chat and sign-in), `SkillAgent`, `FunctionTool` |
+| Charts | `@arcgis/charts-components`: `arcgis-chart` |
+| UI | Calcite components |
+| Validation | A Zod schema for every tool's input |
 
-## 2. Architecture
+There is no backend. The data comes from public ArcGIS Online feature layers,
+and the language model runs on the AI service of the portal you sign in to. The
+app does not choose or host the model.
 
-```text
-App.tsx            Layout in JSX: Moon scene + slider, Earth scene, assistant
-   │ creates
-map/controller.ts  createMoonApp() → `app`: data + every map action (visit, select, frame, flyTo…)
-   ▲                      ▲
-agent/             cards/
- agent.ts  SkillAgent, instructions, live context      Cards.tsx  renders tool cards into chat slots
- skills.ts 3 skills (explore, history, scale)          charts.ts  presets + custom charts
- tools.ts  11 FunctionTools
-   │
-map/  moon.ts earth.ts graphics.ts travel.ts scale.ts     extras/ siteModel.ts flight.ts photos.ts
-   │
-data.ts  layer URLs, types, loadData(), queryCraters(), lookups
+## Architecture
+
+```mermaid
+flowchart TD
+  App["App.tsx<br/>page layout"]
+  controller["map/controller.ts<br/>createMoonApp() returns app"]
+  agent["agent/<br/>agent.ts, skills.ts, tools/"]
+  cards["cards/<br/>chat cards and charts"]
+  map["map/<br/>moon, earth, graphics, travel, scale"]
+  extras["extras/<br/>siteModel, flight"]
+  data["data.ts<br/>layers, types, lookups"]
+
+  App -- creates --> controller
+  App --> agent
+  App --> cards
+  agent -- calls --> controller
+  cards -- calls --> controller
+  controller --> map
+  controller --> extras
+  controller --> data
+  map --> data
 ```
 
-**Key design point:** one object, `app`, holds every map action. The agent's tools and the
-chat-card buttons both call it, so "click a mission" and "take me to Apollo 11" do the same thing.
+One object, `app`, holds every map action. The agent's tools and the buttons on
+chat cards both call it, so clicking a mission and asking for it do the same
+thing.
 
-## 3. Startup
+## Startup
 
-1. `config.ts` sets the portal URL (default `www.arcgis.com`) before any component loads,
-   because the assistant reads the default portal when it loads. `register.ts` then imports only
-   the components the app uses.
-2. `App.tsx` creates both maps once (`useState(createMoonScene)`) and passes them to
-   `<arcgis-scene map={…}>`. The scene components own their views.
-3. `createMoonApp()` loads, in parallel: mission and launch-site records (`layer.queryFeatures()`),
-   both views (`viewOnReady()`), the crater layer's schema, and the geodetic operators.
-4. It then sets the mission renderer from the loaded data, the space environment (stars, virtual
-   lighting), the slider from the mission layer's own `timeInfo`, the travel controller, the chart
-   table, and object moving.
-5. Once `app` exists, React renders `<arcgis-assistant-agent agent={createMoonAgent(app)}>` and the
-   card renderer.
+1. [config.ts](../src/config.ts) sets the portal URL before any component
+   loads, because the assistant reads it when it loads.
+   [register.ts](../src/register.ts) imports only the components the app uses.
+2. [App.tsx](../src/App.tsx) creates both maps once and passes them to the two
+   `arcgis-scene` elements.
+3. `createMoonApp()` loads four things in parallel: the mission and launch-site
+   records, both views, the crater layer's schema, and the geodetic operators.
+4. It sets up the mission symbols, the stars and lighting, the time slider, and
+   the travel between worlds.
+5. When `app` is ready, React renders the agent and the chat cards.
 
-## 4. What happens when you ask something
+## A request, step by step
 
-Example: *"Take me to Apollo 11"*
+"Take me to Apollo 11":
 
-```text
-1. The assistant sends the message plus the agent's instructions, its skills, and a live
-   "runtime context" (which world is showing, slider dates, selection, what's drawn) to the model.
-2. SkillAgent picks a skill ("explore"), which limits which tools the model may use.
-3. The model calls queryData { dataset: "missions", where: "name = 'Apollo 11'", outFields: ["id","name"] }
-   → an ArcGIS REST query on the hosted layer → returns id "apollo-11" (no table card: it's a lookup).
-4. The model calls goTo { target: { kind: "mission", id: "apollo-11" } }
-   → Zod validates the input → the tool looks up the record in memory
-   → sends a "mission-card" to the chat (sendUXSuggestion)
-   → starts app.visit(): travel to the Moon if needed, select + highlight + label, fly in,
-     stand the lunar module at the site, slow orbit
-   → returns JSON facts (dates, launch site, days to surface, photo metadata) to the model.
-5. The model writes a one- or two-sentence reply from those facts.
-6. Cards.tsx sees the assistant's slot request and renders the React card into it.
-```
+1. The assistant sends the model your message, the agent's instructions and
+   skills, and a description of what the map shows right now.
+2. The agent picks the `explore` skill. A skill limits which tools may be used.
+3. The model calls `queryData` with `name = 'Apollo 11'`. The tool queries the
+   hosted layer and returns the id `apollo-11`.
+4. The model calls `goTo` with `{ kind: "mission", id: "apollo-11" }`. The tool:
+   - checks the input against its schema,
+   - sends a mission card to the chat,
+   - starts `app.visit()`, which travels to the Moon, selects the mission, flies
+     in, and stands the lunar module at the site,
+   - returns the mission's facts to the model as JSON.
+5. The model writes a short reply from those facts.
+6. [Cards.tsx](../src/cards/Cards.tsx) renders the card in the chat.
 
-**Tools return two things:** a **card** for the user and **JSON facts** for the model. The model
-never draws the UI and never states numbers it wasn't given.
+A tool returns two things: a card for the user and facts for the model. The
+model does not draw the UI.
 
-## 5. The agent
+## The agent
 
-### SkillAgent and skills
+`SkillAgent` takes a system prompt, instructions, skills, tools, and a function
+that describes the current map. A skill is a block of Markdown with guidance
+and a list of allowed tools.
 
-`SkillAgent` (from `@arcgis/ai-components`) is configured with a system prompt, instructions,
-**skills**, **tools**, and a **runtime context loader**. A skill is a Markdown instruction set with
-an `allowed-tools` list; the agent picks one per request, which narrows the tools and adds domain
-guidance.
-
-| Skill | Purpose | Tools |
+| Skill | For | Tools |
 | --- | --- | --- |
-| explore | Find and visit missions, craters, places, launch sites | queryData, goTo, showMissions, chooseMission, showCraters, nearestCraters, showCraterNames, clearMap, showChart, flyLander |
-| history | Chronology, gaps, trends, time slider, charts | queryData, setTime, showMissions, goTo, chooseMission, showChart |
+| explore | Finding and visiting missions, craters, places, launch sites | queryData, goTo, showMissions, chooseMission, showCraters, nearestCraters, showCraterNames, clearMap, showChart, flyLander |
+| history | Chronology, gaps, trends, the time slider, charts | queryData, setTime, showMissions, goTo, chooseMission, showChart |
 | scale | True-scale objects compared with craters | queryData, placeObject, goTo, chooseMission, clearMap |
 
-### The 11 tools
+### Tools
 
 | Tool | What it does |
 | --- | --- |
-| `queryData` | Read-only SQL on missions or craters: `where`, `outFields`, statistics (count/sum/min/max/avg), group by, order by, limit up to 1,000. Shows a table only when `showTable` is set (when the numbers are the answer) |
-| `goTo` | Typed navigation: mission, crater, place, launch site, Moon, or Earth. Travels between worlds automatically |
-| `showMissions` | Shows a set of missions (by SQL `where` or explicit ids), hides the rest, list card. No arguments restores everything |
-| `chooseMission` | **Human-in-the-loop**: the SDK pauses the run and asks the user to pick ("Which Chang'e?") |
-| `showCraters` | Marks exact crater names with rims, framed together |
-| `nearestCraters` | Ranks craters by **true lunar distance** from a mission, crater, or place |
-| `showCraterNames` | Toggles all crater labels |
+| `queryData` | Read-only SQL on missions or craters: `where`, fields, statistics, group by, order by, up to 1,000 rows. Shows a table only when the numbers are the answer |
+| `goTo` | Moves the camera to a mission, crater, place, launch site, the Moon, or Earth. Travels between worlds when needed |
+| `showMissions` | Shows a set of missions and hides the rest, with a list card. With no arguments it restores everything |
+| `chooseMission` | Pauses and asks the user to pick, for example "Which Chang'e?" |
+| `showCraters` | Marks craters by exact name, with their rims |
+| `nearestCraters` | Ranks craters by lunar surface distance from a mission, crater, or place |
+| `showCraterNames` | Shows or hides all crater labels |
 | `setTime` | Sets the slider to the end of a year, or pauses it |
-| `showChart` | 3 presets, or a custom bar/line/pie/scatter chart |
-| `placeObject` | Any real object at true scale (5 generic shapes) |
-| `flyLander` | Easter egg: fly a lunar module with the arrow keys |
+| `showChart` | One of 3 preset charts, or a custom bar, line, pie, or scatter chart |
+| `placeObject` | Stands a real object at true scale, drawn as one of 5 simple shapes |
 | `clearMap` | Removes drawings and selections |
+| `flyLander` | Easter egg: fly a lunar module with the arrow keys |
 
-### Guardrails: why it doesn't make up data
+### How it avoids making things up
 
-- **Facts only come from tools.** The instructions forbid inferring counts from truncated results,
-  estimating from charts, or inventing dates and numbers.
-- **Typed ids, no fuzzy matching.** Actions take exact ids or names the model first gets from
-  `queryData`. Unknown ids return an error the model can read.
-- **Exact values in the tool description.** Countries, operators, launch-site ids, and crater sides
-  are listed, so the model doesn't guess `'near'` for `'Near side'`.
-- **Errors go back to the model.** A `returnErrors` wrapper turns tool errors into a result the
-  model can correct. Without it, SDK 5.2 ends the whole request with "I couldn't
+- Facts come only from tools. The instructions forbid estimating numbers,
+  reading values off charts, or counting from cut-off results.
+- Actions take exact ids or names that the model first gets from `queryData`.
+  There is no fuzzy matching. An unknown id returns an error the model can read.
+- The tool descriptions list the exact values in the data (countries,
+  operators, launch-site ids), so the model does not guess them.
+- Tool errors go back to the model. Without the `returnErrors` wrapper in
+  [tools/shared.ts](../src/agent/tools/shared.ts), SDK 5.2 ends the request with "I couldn't
   complete this request."
-- **Live context.** Before each turn the model is told which world is showing, the slider dates, the
-  selection, the last place the camera went, and what's drawn. That's how "tell me more about it"
-  and "pause" resolve.
-- **Stated limits.** No depths, no broad "named after" searches, surface arrivals only. The guide
-  says so instead of improvising.
+- Before each turn the model is told which world is showing, the slider dates,
+  the selection, the last place the camera went, and what is drawn. This is how
+  "tell me more about it" works.
+- The instructions state what the data does not cover: crater depths, features
+  that are not craters, and launches that never reached the surface.
 
-## 6. The data
+## Data
 
 | Layer | Records | Source | How it's used |
 | --- | --- | --- | --- |
-| Missions | 51 | NASA NSSDCA "Table of Anthropogenic Impacts and Spacecraft on the Moon" (Aug 2025) | Loaded once at startup into memory; displayed from the hosted layer; queried by SQL |
-| Craters | 1,575 | IAU/USGS Gazetteer of Planetary Nomenclature (2019 crater-only extract) | Queried from the service on demand; all 1,575 in one request (`maxRecordCountFactor: 2`) |
-| Launch sites | 10 | Curated | Loaded once; their ids are an enum in the `goTo` schema |
+| Missions | 51 | NASA NSSDCA | Read once at startup into memory; also queried with SQL |
+| Craters | 1,575 | IAU/USGS gazetteer | Queried from the service when needed |
+| Launch sites | 10 | Curated | Read once at startup |
 
-All three are public hosted feature layers on ArcGIS Online: no sign-in for the data. CSV backups
-are in `backups/`. Mission outcomes are `crewed`, `soft` (robotic landing), `crash`, and `impact`
-(planned impact); 28 are successful landings. Photos of 22 sites come from LROC (NASA/GSFC/ASU);
-the lunar module model is from NASA 3D Resources.
+Mission outcomes are `crewed`, `soft` (robotic landing), `crash`, and `impact`
+(planned impact). 28 of the 51 are successful landings. CSV copies are in
+`backups/`.
 
-## 7. The 3D map
+## The map
 
-### The Moon on an Earth-sized globe
+### The Moon is drawn on an Earth-sized globe
 
-The Moon's imagery and elevation services are published in Web Mercator, so the scene draws the
-Moon at Earth size. **`scale.ts` is the only place that converts:** `sceneMeters()` multiplies real
-lunar meters by about **3.67** (Earth radius ÷ Moon radius) for symbol sizes, heights, and camera
-distances.
+The Moon's imagery and elevation services are published in Web Mercator, so the
+scene draws the Moon at Earth's size. [scale.ts](../src/map/scale.ts) is the only
+file that deals with this. `sceneMeters()` multiplies real lunar meters by about
+3.67 (Earth's radius divided by the Moon's) for symbol sizes, heights, and
+camera distances.
 
-**Measurements are truly lunar.** Distances and circles use the SDK's **geodetic operators in
-GCS_Moon_2000 (wkid 104903)**, the Moon's own coordinate system, radius 1,737.4 km.
+Distances are still real lunar distances. They use the SDK's geodetic operators
+in the Moon's own coordinate system, GCS_Moon_2000 (wkid 104903).
 
-*Why not a native Moon coordinate system?* SceneView supports it experimentally, but there are no
-public Moon imagery and elevation services published in it.
+SceneView can use a Moon coordinate system directly, as an experimental feature,
+but that needs imagery and elevation services published in it.
 
-### Symbology
+### Symbols
 
-- **Mission icons:** one `PointSymbol3D` per country and outcome with **two `IconSymbol3DLayer`s**,
-  an outcome disc plus a flag pinned to its corner, floating on a leader line (`LineCallout3D`) above
-  the exact landing point. A `UniqueValueRenderer` on `country` + `outcome`, grouped by outcome.
-- **Launch sites:** an orange rocket icon in the same style.
-- **Selection:** `layerView.highlight()`, labels for up to 6 missions, and `FeatureFilter` to hide
-  the rest.
+- Mission icons are a `PointSymbol3D` with two icon layers: a disc for the
+  outcome and a country flag on its corner. The icon floats above the site on a
+  thin line, so it never sinks into a crater wall.
+- A `UniqueValueRenderer` on `country` and `outcome` picks the icon.
+- Selecting uses `layerView.highlight()`, labels for up to 6 missions, and a
+  `FeatureFilter` to hide the rest.
 
-### The time slider
+### Time slider
 
-The native `arcgis-time-slider`. Its range comes from the mission layer's `timeInfo`; cumulative
-mode, 2-month stops. The agent sets its extent through `setTime`.
+The `arcgis-time-slider` takes its range from the mission layer's `timeInfo`. It
+is cumulative, with a stop every 2 months.
 
-### Camera and animation
+### Travel between Earth and the Moon
 
-- **Two stacked scenes.** Earth and the Moon both render all the time, so the trip is instant.
-- **The trip.** The departing camera pulls back while arcing 35° around the globe; the globe slides
-  toward a corner by animating the view's **`padding`** (which moves only the 3D content, not the
-  widgets); the scenes crossfade with CSS opacity; the arriving globe sweeps in from the opposite
-  corner.
-- **Close-ups.** `view.goTo()`, then a slow 30° orbit over 9 seconds. Any user input or new `goTo`
-  cancels it.
-- **Reduced motion** is honored throughout.
+Both scenes are loaded all the time and stacked on top of each other. A trip:
+
+1. The departing camera pulls back and arcs 35° around the globe.
+2. The globe slides toward a corner. This animates the view's `padding`, which
+   moves the 3D content but not the widgets.
+3. The scenes crossfade with CSS opacity.
+4. The other globe slides in from the opposite corner and the camera flies in.
+
+After a close-up the camera orbits 30° over 9 seconds. Any user input stops it.
+The app respects the "reduce motion" setting throughout.
 
 ### Drawings and extras
 
-- **Crater rims:** geodesic circles from the recorded diameter.
-- **True-scale objects:** SDK primitives (`ObjectSymbol3DLayer`: cylinder, cone, cube, sphere).
-  Drag them with the SDK's `SketchViewModel` in move mode; the label follows.
-- **Lunar module at visited sites:** a glTF model sized to the camera distance; it hides when you
-  zoom out.
-- **Flight easter egg:** a `requestAnimationFrame` loop moves the lander along its heading and puts a
-  chase camera behind it; arrow keys are captured on the window.
+- Crater rims are geodesic circles from the recorded diameter.
+- True-scale objects are SDK primitives (cylinder, cone, cube, sphere). You can
+  drag them; the label follows.
+- The lunar module at a visited site is a glTF model sized to the camera
+  distance. It hides when you zoom out.
+- The flight easter egg moves the lander each animation frame and keeps a
+  camera behind it.
 
-## 8. Charts
+## Charts
 
-- **Craters:** charted straight from the hosted layer.
-- **Missions:** a **client-side `FeatureLayer` built once** from the loaded records. It keeps the
-  hosted field names and values, adds derived fields (`side`, `daysToSurface`, decades, decimal
-  years), and uses **coded-value domains**, so axes show "Crewed landing" or "Cape Canaveral"
-  instead of codes.
-- **Dates on the x-axis** are counted per year.
-- A custom chart is checked against the table's fields, and its SQL is validated with a count query,
-  before the card is shown.
+- Crater charts read the hosted crater layer directly.
+- Mission charts read a client-side `FeatureLayer` built once from the loaded
+  records. It keeps the hosted field names, adds derived fields (`side`,
+  `daysToSurface`, decades), and uses coded-value domains so axes show
+  "Crewed landing" instead of `crewed`.
+- A custom chart is checked against the available fields, and its SQL is tested
+  with a count query, before the card is shown.
 
-## 9. Security, privacy, cost
+## Security and cost
 
-- **What the model sees:** the tool descriptions, your messages, the live context, and the rows its
-  own queries return. Never the database, the code, or credentials.
-- **What it can do:** only call the 11 registered tools. Each input is validated by a Zod schema;
-  field names must be plain identifiers.
-- **SQL injection:** `where` clauses go to the ArcGIS REST `query` endpoint of **public, read-only**
-  layers, which parses and validates the SQL. The worst case is a failed read; there are no write
-  tools at all.
-- **Secrets:** none in the app. Sign-in is OAuth with the portal, handled by `arcgis-assistant`.
-  `NEXT_PUBLIC_*` variables hold only the portal URL and optional settings.
-- **Cost and model:** the model and its billing come from the portal's AI service; the app doesn't
-  choose the model.
+- The model sees the tool descriptions, your messages, the map description, and
+  the rows its queries return. It does not see credentials.
+- It can only call the 12 tools. Every input is checked by a Zod schema.
+- SQL `where` clauses go to the query endpoint of public, read-only layers. The
+  worst case is a failed read. There are no tools that write data.
+- The app holds no secrets. Sign-in is OAuth with the portal, handled by
+  `arcgis-assistant`.
+- Hosting is static. AI usage is billed through the portal's AI service.
 
-## 10. Known limits and SDK workarounds (5.2)
+## Known limits
 
-- **Tool errors are fatal by default** (confirmed in 5.2): hence the `returnErrors` wrapper.
-- **Popups** (seen on prerelease builds): closing clears the content but not the frame, so the app closes it on `arcgisClose`.
-  Automatic popup templates come up empty, so both layers define their own.
-- **Legend swatches** (seen on prerelease builds): the legend ignores `anchorPosition`, so swatches show the flag over the
+- Built for desktop. Two 3D scenes and a chat panel need a wide screen.
+- The data covers only missions that reached the surface, and only named
+  craters. Crater depths are not included.
+- Point-to-point measurements between two arbitrary places are not supported.
+- The legend ignores the flag's position, so swatches show the flag over the
   disc. The map itself is correct.
-- **Voice input:** `voice-input-enabled` is passed as an attribute (not in the React typings yet) and
-  uses the browser's speech recognition, so it works best in Chrome.
-- **Data scope:** surface arrivals only, named craters only, no depths.
+- SDK workarounds are listed in the [reference](./reference.md#sdk-caveats-52).
 
-## 11. Likely questions
+## Common questions
 
-**"Is this scripted?"**
-No. There's no mapping from questions to actions. The model picks skills and tools from their
-descriptions. "Why did it go quiet?" works because the model queries the chronology and reasons over
-the dates it gets back.
+**Is it scripted?**
+No. Nothing maps questions to actions. The model picks tools from their
+descriptions.
 
-**"Which LLM is it?"**
-Whichever model the ArcGIS AI service provides through the portal; the app doesn't host or choose
-one.
+**Which model is it?**
+Whichever one the portal's AI service provides.
 
-**"Is there a backend?"**
-No. It's a static Next.js app. Data comes from ArcGIS Online feature services; reasoning from the
-portal's AI service.
+**Can it change or delete data?**
+No. Every data tool is read-only, and so are the layers.
 
-**"How do you stop it making things up?"**
-Facts only come from tool results; actions take exact ids, not names; cards are rendered from data,
-not model text; errors go back to the model; the instructions forbid estimating numbers.
+**How does it know the Burj Khalifa's height?**
+From the model's general knowledge, and the card says so. The crater's diameter
+comes from the IAU data.
 
-**"Can it delete or change data?"**
-No. Every data tool is read-only, and the layers are public read-only services.
+**Why two scenes instead of one?**
+Earth and the Moon have different imagery, terrain, and scale. Keeping both
+loaded makes the trip instant.
 
-**"How are distances calculated?"**
-With the SDK's geodetic distance operator in the Moon's coordinate system (GCS_Moon_2000), so they're
-real lunar surface distances. Collins crater is 20 km from Apollo 11.
-
-**"How does it know the Burj Khalifa's height?"**
-From the model's general knowledge, and the card says so. The crater's diameter is from the IAU data.
-
-**"How much code is it?"**
-About 2,760 lines. Adding a capability is one `FunctionTool`, a Zod schema, and a line in a skill.
-
-**"Would this work on my data?"**
-Yes. The pattern is a scene, an assistant, and tools over your feature layers. The Moon-specific
-code is mostly `scale.ts` and the travel animation.
-
-**"Why two scenes instead of one?"**
-The two worlds have different imagery, terrain, and scale. Keeping both loaded makes the trip
-instant and the crossfade smooth.
-
-**"What does it cost to run?"**
-Hosting is static. AI usage is billed through the portal's AI service.
-
-**"What happens with an ambiguous request?"**
-It asks. `chooseMission` uses the SDK's human-in-the-loop interrupt; try "Take me to Chang'e".
-
-**"Does it work on mobile?"**
-It's built for desktop: two 3D scenes plus the chat panel need a wide screen.
-
-## 12. Numbers
-
-| Fact | Value |
-| --- | --- |
-| Missions that reached the surface | 51 (28 successful landings) |
-| By country | USA 21, USSR 14, China 5, Japan 5, India 3, Europe (ESA) 1, Israel 1, Russia 1 |
-| From Cape Canaveral | 23 (including Israel's Beresheet and Japan's two Hakuto-R missions) |
-| The quiet years | Luna 24 (Aug 1976) to Chang'e 3 (Dec 2013) |
-| Named craters | 1,575 |
-| Apollo 11 crew craters | Collins 20 km, Aldrin 47 km, Armstrong 49 km from the landing site |
-| Armstrong crater | 4.2 km across |
-| Scene scale factor | About 3.67 (Earth radius ÷ Moon radius 1,737.4 km) |
-| Earth–Moon distance quoted | 384,400 km |
-| Flight easter egg | 20 km/s; starts at 15 km; 200 m to 200 km |
+**Would this work on my data?**
+Yes. You need a scene, an assistant, and tools over your layers. The
+Moon-specific code is mostly `scale.ts` and the travel animation. See
+[Build your own](./build-your-own.md).

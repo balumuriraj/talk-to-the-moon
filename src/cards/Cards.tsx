@@ -7,7 +7,7 @@ import { CraterCard, CraterListCard, ObjectCard } from "./CraterCards";
 import { MissionCard, MissionListCard } from "./MissionCards";
 import { QueryCard, type QueryResults } from "./QueryCard";
 
-/** The data each card type receives from a tool (see `showCard` in agent/tools.ts). */
+/** The data each card type receives from a tool (see `showCard` in agent/tools/shared.ts). */
 export type CardData = {
   "query-results": QueryResults & { title: string };
   "mission-card": { id: string };

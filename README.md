@@ -1,123 +1,150 @@
 # Talk to the Moon
 
-A Next.js example of an AI assistant that operates an ArcGIS 3D map. Ask
-"Take me to Apollo 11" and the assistant finds the mission, flies the camera
-there, stands a lunar module at the site, and shows a card in the chat.
+An AI assistant that drives a 3D map. Ask **"Take me to Apollo 11"** and it
+finds the mission, flies the camera from Earth to the Moon, stands a lunar
+module at the landing site, and shows a card in the chat.
 
-It's built from the ArcGIS Maps SDK for JavaScript components (`arcgis-scene`,
-`arcgis-time-slider`, `arcgis-chart`, `arcgis-assistant`), Calcite, and a
-`SkillAgent` with 11 tools. There's no AI backend of its own.
+It is a small example of an **agentic map**: a chat assistant that can only act
+through a few typed tools over real data. The same pattern works on any map.
+
+Built with Next.js, React, TypeScript, and the
+[ArcGIS Maps SDK for JavaScript](https://developers.arcgis.com/javascript/latest/) 5.2.
+There is no backend: the page is static, the data is public, and the language
+model runs on the ArcGIS AI service you sign in to.
 
 ## Run it
 
-With Node.js 20.9+ and pnpm:
+You need Node.js 20.9+ and [pnpm](https://pnpm.io/).
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Open <http://localhost:3006> and sign in through the assistant. The AI portal is
-**<https://www.arcgis.com>** by default; your account needs access to its AI
-service. The map data is public and needs no sign-in.
+Open <http://localhost:3006>. The map works straight away. To chat, sign in
+through the assistant panel with an ArcGIS account that has access to the AI
+assistant service.
 
-To change the portal, copy [.env.example](./.env.example) to `.env.local` and set
-`NEXT_PUBLIC_PORTAL_URL`. `NEXT_PUBLIC_*` values are visible in the browser, so
-never put secrets in them.
+To use a portal other than <https://www.arcgis.com>, copy
+[.env.example](./.env.example) to `.env.local` and set `NEXT_PUBLIC_PORTAL_URL`.
 
-Try **"Take me to Apollo 11"**, **"Show me every place we've landed on the Moon"**,
-**"What's named after the Apollo 11 crew?"** and **"Stand the Burj Khalifa in Tycho crater"**.
+Best on a desktop browser with a wide window.
+
+## Things to try
+
+The assistant suggests these one at a time, or type your own:
+
+| Prompt | What it shows |
+| --- | --- |
+| How many missions have been launched from each country? | A question answered with a table |
+| Where did those missions land? | The trip from Earth to the Moon |
+| Go to an Apollo mission | The assistant asks which one instead of guessing |
+| Show the nearest crater | Real lunar distances |
+| Place the tallest building on Earth inside it | An object at true scale |
+| Let me fly the lander | An easter egg: arrow keys steer, Esc lands |
 
 ## How it works
 
-```text
-User message
-  -> SkillAgent picks a skill, then a FunctionTool
-  -> the tool validates its input and looks up real data
-  -> the tool calls a map action (app.visit, app.select, ...)
-  -> the tool sends a card to the chat and returns facts to the model
-  -> the model explains the facts in a sentence or two
+```mermaid
+flowchart LR
+  user([You]) -- message --> assistant["Assistant<br/>(chat panel)"]
+  assistant <--> model["AI service<br/>(language model)"]
+  assistant -- "tool call" --> tools["12 tools"]
+  tools --> app["Map actions<br/>(one shared object)"]
+  tools -- "card" --> cards["Chat cards"]
+  cards -- "button click" --> app
+  app --> map["3D map<br/>Earth and Moon"]
+  tools -- "query" --> data[("Public data<br/>missions, craters, launch sites")]
 ```
 
-React renders the page. The SDK components own the scenes, the time slider, the
-chat, and the charts. The app's own code is data, tools, map actions, and cards.
+1. You type a message.
+2. The model picks a tool, for example `goTo`, and fills in its input.
+3. The tool checks the input, looks up real data, and moves the map.
+4. The tool sends a **card** to the chat and returns **facts** to the model.
+5. The model writes a short reply from those facts.
 
-## Read the code in this order
+"Take me to Apollo 11" in detail:
 
-| File | What to look for |
-| --- | --- |
-| [App.tsx](./src/App.tsx) | The whole layout in JSX: two scenes, the slider, the assistant, and the agent |
-| [map/controller.ts](./src/map/controller.ts) | Startup, and the map actions that tools and cards share (`visit`, `select`, `frame`) |
-| [agent/tools.ts](./src/agent/tools.ts) | The tools. Start with `goTo` |
-| [agent/agent.ts](./src/agent/agent.ts) and [skills.ts](./src/agent/skills.ts) | Instructions, skills, and the live context the model sees |
-| [cards/Cards.tsx](./src/cards/Cards.tsx) | How a tool's card data becomes a React card in the chat |
-| [data.ts](./src/data.ts) | The hosted layers, record types, and lookups |
+```mermaid
+sequenceDiagram
+  actor You
+  participant Assistant
+  participant Model as AI service
+  participant Tools
+  participant Map
 
-[docs/build-your-own.md](./docs/build-your-own.md) traces one request through
-these files and shows how to add a tool.
+  You->>Assistant: Take me to Apollo 11
+  Assistant->>Model: message and what the map shows now
+  Model->>Tools: queryData (find Apollo 11)
+  Tools-->>Model: id apollo-11
+  Model->>Tools: goTo (mission apollo-11)
+  Tools->>Map: fly to the Moon and the landing site
+  Tools->>Assistant: mission card
+  Tools-->>Model: mission facts
+  Model-->>Assistant: short reply
+  Assistant-->>You: reply and card
+```
 
-## Layout
+Two things keep the answers trustworthy:
+
+- **Facts come only from tools.** The model never invents numbers; it explains
+  what a tool returned.
+- **Tools take exact ids, not free text.** If a request is unclear, the
+  assistant asks you to choose.
+
+## Find your way around the code
 
 ```text
-app/                  Next.js entry: renders src/App.tsx in the browser only
+app/                Next.js entry page
 src/
-  App.tsx             Layout and startup
-  config.ts           Portal and API key, set before any component loads
-  register.ts         The SDK and Calcite components the app uses
-  data.ts             Layer URLs, types, loadData(), queries, static references
-  map/
-    moon.ts           Moon map, mission and crater layers, renderer, popups
-    earth.ts          Earth map and launch sites
-    scale.ts          Lunar units on the Earth-sized display globe; lunar distances
-    graphics.ts       Crater marks and true-scale objects
-    travel.ts         The Earth-to-Moon transition
-    controller.ts     Startup plus the map actions
-  agent/              SkillAgent, skills, tools
-  cards/              Chat cards and charts
-  extras/             Optional: the 3D lander at visited sites, orbital photos, and a lander flight easter egg
-public/               Icons, flags, photos, and the lander model
-backups/              CSV copies of the hosted layers, for republishing
+  App.tsx           Page layout: two 3D scenes, time slider, assistant
+  data.ts           Data layers, record types, lookups
+  map/              The maps and everything that changes them
+    controller.ts   The shared map actions (visit, select, frame, ...)
+  agent/            The assistant: instructions, skills, tools
+    tools/          The 12 tools, a few per file. Start with navigate.ts
+  cards/            Chat cards and charts
+  extras/           Optional: 3D lander model, flight easter egg
+test/               Unit tests
+docs/               Guides
+backups/            CSV copies of the data layers
 ```
 
-## Choices worth copying
-
-- **Small data is loaded once.** The 51 missions and 10 launch sites are read
-  with `layer.queryFeatures()` at startup and used as plain arrays. The 1,575
-  craters stay on the service and are queried with SQL when needed.
-- **The SDK does the work.** Icons are two `IconSymbol3DLayer`s (outcome disc and
-  flag) rather than generated SVG. Selection uses `layerView.highlight()` and
-  `FeatureFilter`. The slider takes its range from the layer's `timeInfo`. Chart
-  labels come from coded-value domains. Lunar distances use the geodetic
-  operators in the Moon's coordinate system.
-- **One object for map actions.** Tools and card buttons both call
-  `app.visit(mission)`, so a click and a chat request behave the same.
-- **Tools return facts, cards show them.** A tool sends a card for the user and
-  returns JSON for the model, and the model never makes up numbers.
-
-The Earth intro, the lander model, photos, true-scale objects, and charts are extras on
-top of the pattern. For your own app, start with one scene, one assistant, and
-one tool.
+Read [App.tsx](./src/App.tsx), then [controller.ts](./src/map/controller.ts),
+then [tools/navigate.ts](./src/agent/tools/navigate.ts). The
+[build-your-own guide](./docs/build-your-own.md) follows one request through
+these files and shows how to add a tool.
 
 ## Check your changes
 
 ```bash
-pnpm test
-pnpm check-types
-pnpm lint
-pnpm build
+pnpm test && pnpm check-types && pnpm lint && pnpm build
 ```
 
-The tests run with the real SDK in Node and cover lunar geometry, record
-parsing, the renderer, and chart checks. Sign-in, rendering, and the model's
-behavior need a browser.
+## Learn more
 
-## Further reading
+- [Build your own](./docs/build-your-own.md): follow a request and add a tool
+- [Technical guide](./docs/technical-guide.md): architecture, every tool, and common questions
+- [Reference](./docs/reference.md): configuration, data sources, and SDK caveats
+- [Test prompts](./docs/test-prompts.md): prompts that cover every tool and card
+- [Demo script](./docs/demo.md): a three-minute walkthrough
 
-- [Build your own: trace a request and add a tool](./docs/build-your-own.md)
-- [Test prompts: a manual pass through every tool and card](./docs/test-prompts.md)
-- [Demo script](./demo.md)
-- [Technical guide: how it all works, with answers to likely questions](./docs/technical-guide.md)
-- [Data sources and SDK caveats](./docs/reference.md). Check the
-  asset terms there before reusing photos or models.
+## Credits
 
-This is a desktop-focused example on the ArcGIS Maps SDK for JavaScript 5.2 (`5.2.4`).
+- **Missions:** NASA NSSDCA, Table of Anthropogenic Impacts and Spacecraft on the Moon
+- **Craters:** IAU/USGS Gazetteer of Planetary Nomenclature
+- **Lander model:** NASA 3D Resources
+
+Details are in the [reference](./docs/reference.md#data). This project is not
+affiliated with or endorsed by NASA.
+
+## AI-assisted development
+
+This app was built with help from AI coding tools. The code and docs were
+reviewed by a person, but mistakes may remain. Check anything you plan to rely
+on, and please open an issue if you find a problem.
+
+## License
+
+[MIT](./LICENSE) for the code. The lander model and the data in `backups/` keep
+their own terms.
