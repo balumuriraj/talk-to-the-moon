@@ -4,6 +4,9 @@ An AI assistant that drives a 3D map. Ask **"Take me to Apollo 11"** and it
 finds the mission, flies the camera from Earth to the Moon, stands a lunar
 module at the landing site, and shows a card in the chat.
 
+**Try it live: <https://talk-to-the-moon.vercel.app/>** (chatting needs an ArcGIS
+account with access to the AI assistant service).
+
 Watch the full one-minute demo:
 
 https://github.com/user-attachments/assets/94fcb1e4-a664-470e-bb05-423173fabc6a
